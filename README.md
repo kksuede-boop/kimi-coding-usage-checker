@@ -1,41 +1,73 @@
 # Kimi Coding Plan Usage Checker
 
-A Playwright-based automation tool to check [Kimi Coding Plan](https://www.kimi.com/code) usage statistics. Designed to be called by AI agents with minimal model involvement.
+A Playwright-based automation tool to check [Kimi Coding Plan](https://www.kimi.com/code) usage statistics. **Designed for AI agents** — minimal model involvement, just run the script and parse JSON output.
+
+## For AI Agents: Quick Integration
+
+### One-time setup (run these commands in order)
+
+```bash
+git clone https://github.com/kksuede-boop/kimi-coding-usage-checker.git ~/kimi-coding-usage-checker
+cd ~/kimi-coding-usage-checker
+pip install playwright
+python -m playwright install chromium
+```
+
+### First-time login (requires human interaction ONCE)
+
+```bash
+python ~/kimi-coding-usage-checker/check_usage.py --no-headless
+```
+
+> Tell the user: "A Chromium window has opened. Please log in to kimi.com, then the window will close automatically."
+
+### Regular usage (fully automated, no human needed)
+
+```bash
+python ~/kimi-coding-usage-checker/check_usage.py --output json
+```
+
+### Handle the output
+
+```python
+import json, subprocess
+
+result = subprocess.run(
+    ["python", "~/kimi-coding-usage-checker/check_usage.py", "--output", "json"],
+    capture_output=True, text=True
+)
+data = json.loads(result.stdout)
+
+if data["status"] == "success":
+    # Report to user
+    print(f"Weekly quota: {data['quota']['weekly_usage_percent']}% used")
+    print(f"Rate limit: {data['rate_limit']['usage_percent']}% used")
+    print(f"Member: {data['member']['level']}")
+elif data["status"] == "login_required":
+    # Tell user to run --no-headless once
+    print("Session expired. Please run with --no-headless to re-login.")
+```
+
+### Error handling for agents
+
+| `status` value | What to do |
+|---|---|
+| `success` | Parse and report data normally |
+| `login_required` | Tell user: "Kimi session expired, please run `python .../check_usage.py --no-headless` to re-login" |
+| `error` | Report the `message` field to user |
+
+---
 
 ## Features
 
-- Checks weekly quota usage percentage and reset countdown
-- Shows rate limit status
-- Displays member tier and model access level
-- Lists recent API request history (with total count)
-- Uses independent Chromium browser - **does NOT touch user's Chrome**
-- Headless after one-time login setup
+- Weekly quota usage percentage and reset countdown
+- Rate limit status
+- Member tier and model access level
+- Recent API request history (with total count)
+- Uses independent Chromium — **does NOT touch user's Chrome**
+- Headless after one-time login
 
-## Quick Start
-
-```bash
-# Install dependencies
-pip install playwright
-python -m playwright install chromium
-
-# First run - login in Playwright's Chromium
-python check_usage.py --no-headless --output json
-
-# Subsequent runs - fully automated headless
-python check_usage.py --output json
-```
-
-## Usage as Agent Skill
-
-This tool is designed to be called by AI agents. The agent runs:
-
-```bash
-python /path/to/check_usage.py --output json
-```
-
-And parses the JSON output to report usage status.
-
-## Output Example
+## Output Schema
 
 ```json
 {
@@ -57,7 +89,7 @@ And parses the JSON output to report usage status.
   "total_records": 100,
   "recent_requests": [
     {
-      "request_id": "...",
+      "request_id": "170bb4c1-...",
       "name": "hermes260505",
       "source": "claude-code/0.1.0",
       "call_type": "Model Inference",
@@ -79,10 +111,36 @@ And parses the JSON output to report usage status.
 ## How It Works
 
 1. Uses Playwright's bundled Chromium (not your Chrome)
-2. Maintains its own persistent browser profile at `~/.kimi-coding-checker/chromium-profile/`
-3. First run opens a visible Chromium window for you to log in to kimi.com
-4. After login, the session is preserved - all subsequent runs are headless
-5. Forces `locale=en-US` to ensure consistent English page text for parsing
+2. Maintains persistent profile at `~/.kimi-coding-checker/chromium-profile/`
+3. First run: visible Chromium window for one-time login
+4. After login: all subsequent runs are headless and fully automated
+5. Forces `locale=en-US` for consistent English page parsing
+
+## Architecture (for other developers)
+
+```
+User/Agent
+    |
+    v
+python check_usage.py --output json   (shell command)
+    |
+    v
+Playwright Chromium (headless, independent instance)
+    |
+    v
+kimi.com/code/console  (navigates, waits for render)
+    |
+    v
+JavaScript evaluation (extracts innerText + table data)
+    |
+    v
+Python regex parsing (structured extraction)
+    |
+    v
+JSON to stdout  (agent reads this)
+```
+
+No model/LLM is involved in the runtime. The script does everything deterministically.
 
 ## Requirements
 
