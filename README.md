@@ -7,9 +7,9 @@ A Playwright-based automation tool to check [Kimi Coding Plan](https://www.kimi.
 - Checks weekly quota usage percentage and reset countdown
 - Shows rate limit status
 - Displays member tier and model access level
-- Lists recent API request history
-- Supports headless operation after one-time login
-- Can use existing Chrome login state directly
+- Lists recent API request history (with total count)
+- Uses independent Chromium browser - **does NOT touch user's Chrome**
+- Headless after one-time login setup
 
 ## Quick Start
 
@@ -18,22 +18,22 @@ A Playwright-based automation tool to check [Kimi Coding Plan](https://www.kimi.
 pip install playwright
 python -m playwright install chromium
 
-# First run - login in browser
+# First run - login in Playwright's Chromium
 python check_usage.py --no-headless --output json
 
-# Subsequent runs - fully automated
+# Subsequent runs - fully automated headless
 python check_usage.py --output json
 ```
 
 ## Usage as Agent Skill
 
-This tool is designed to be called by AI agents (e.g., QoderWork) to check Kimi Coding Plan usage. The agent runs:
+This tool is designed to be called by AI agents. The agent runs:
 
 ```bash
 python /path/to/check_usage.py --output json
 ```
 
-And parses the JSON output to report usage status to the user.
+And parses the JSON output to report usage status.
 
 ## Output Example
 
@@ -41,21 +41,30 @@ And parses the JSON output to report usage status to the user.
 {
   "status": "success",
   "quota": {
-    "weekly_usage_percent": 23,
-    "resets_in_value": 143,
+    "weekly_usage_percent": 27,
+    "resets_in_value": 138,
     "resets_in_unit": "hours"
   },
   "rate_limit": {
-    "usage_percent": 17,
-    "resets_in_value": 11,
+    "usage_percent": 21,
+    "resets_in_value": 17,
     "resets_in_unit": "minutes"
   },
   "member": {
     "level": "Moderato",
-    "model_access": "K2.6 Flagship model"
+    "model_access": "K2.6"
   },
   "total_records": 100,
-  "recent_requests": [...]
+  "recent_requests": [
+    {
+      "request_id": "...",
+      "name": "hermes260505",
+      "source": "claude-code/0.1.0",
+      "call_type": "Model Inference",
+      "datetime": "2026-05-25 15:28:45",
+      "status": "Success"
+    }
+  ]
 }
 ```
 
@@ -64,22 +73,22 @@ And parses the JSON output to report usage status to the user.
 | Option | Description |
 |--------|-------------|
 | `--no-headless` | Show browser (for login) |
-| `--chrome-profile` | Use existing Chrome login (Chrome must be closed) |
 | `--login` | Clear saved state and re-login |
 | `--output json\|text` | Output format |
 
-## How Login Works
+## How It Works
 
-1. **Persistent Profile Mode** (default): First run opens a browser for manual login. After login, the browser profile is saved at `~/.kimi-coding-checker/browser-profile/` and reused for subsequent headless runs.
-
-2. **Chrome Profile Mode** (`--chrome-profile`): Directly uses your Chrome's login state. Requires Chrome to be closed since the profile is locked while Chrome runs.
+1. Uses Playwright's bundled Chromium (not your Chrome)
+2. Maintains its own persistent browser profile at `~/.kimi-coding-checker/chromium-profile/`
+3. First run opens a visible Chromium window for you to log in to kimi.com
+4. After login, the session is preserved - all subsequent runs are headless
+5. Forces `locale=en-US` to ensure consistent English page text for parsing
 
 ## Requirements
 
 - Python 3.9+
 - Playwright (`pip install playwright`)
-- Chromium browser (`python -m playwright install chromium`)
-- Google Chrome (for `channel="chrome"`)
+- Chromium (`python -m playwright install chromium`)
 
 ## License
 
